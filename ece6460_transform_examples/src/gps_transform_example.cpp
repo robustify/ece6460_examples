@@ -44,4 +44,17 @@ int main(int argc, char** argv)
   std::cout << "Our current position is " << relative_pos_east << " meters East and "
             << relative_pos_north << " meters North of the reference point\n";
 
+  double heading = -135.0 * M_PI / 180.0;
+  current_position.track = heading; // This is where the simulated heading will be; in the 'track' field
+
+  tf::Transform utm_to_vehicle;
+  utm_to_vehicle.setOrigin(tf::Vector3(current_utm_x, current_utm_y, 0.0));
+  utm_to_vehicle.setRotation(tf::createQuaternionFromYaw(current_position.track));
+
+  tf::Vector3 ref_utm_vect(ref_utm_x, ref_utm_y, 0.0);
+
+  tf::Vector3 vehicle_frame_vect = utm_to_vehicle.inverse() * ref_utm_vect;
+  std::cout << "The reference point is " << vehicle_frame_vect.x() << " meters in front and "
+            << vehicle_frame_vect.y() << " meters to the left of our current heading\n";
+
 }
