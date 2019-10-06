@@ -71,14 +71,38 @@ namespace ece6460_marker_example {
 
   void MarkerExample::initTextMarker()
   {
-    // TODO: Set up text marker here
+    text_marker_msg_.header.frame_id = "frame1";
+    text_marker_msg_.id = 2;
+    text_marker_msg_.action = visualization_msgs::Marker::ADD;
+    text_marker_msg_.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+
+    text_marker_msg_.pose.position.x = 0.0;
+    text_marker_msg_.pose.position.y = 0.0;
+    text_marker_msg_.pose.position.z = 0.0;
+    text_marker_msg_.pose.orientation.w = 1.0;
+
+    text_marker_msg_.scale.z = 1.0;
+    text_marker_msg_.text = "insert_text_here";
+
+    text_marker_msg_.color.a = 1.0;
+    text_marker_msg_.color.r = 0.0;
+    text_marker_msg_.color.g = 1.0;
+    text_marker_msg_.color.b = 0.0;
   }
 
   void MarkerExample::timerCallback(const ros::TimerEvent& event)
   {
-    // TODO: Update marker time stamps
+    // Update marker time stamps
+    cube_marker_msg_.header.stamp = event.current_real;
+    arrow_marker_msg_.header.stamp = event.current_real;
+    text_marker_msg_.header.stamp = event.current_real;
   
-    // TOOD: Combine markers into a MarkerArray message and publish it
+    // Combine markers into a MarkerArray message and publish it
+    visualization_msgs::MarkerArray marker_array_msg;
+    marker_array_msg.markers.push_back(cube_marker_msg_);
+    marker_array_msg.markers.push_back(arrow_marker_msg_);
+    marker_array_msg.markers.push_back(text_marker_msg_);
+    pub_marker_array_.publish(marker_array_msg);
   }
 
 }
