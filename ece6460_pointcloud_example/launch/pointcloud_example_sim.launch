@@ -2,7 +2,9 @@
 <launch>
 
   <!-- Run the point cloud processing node -->
-  <node pkg="ece6460_pointcloud_example" type="pointcloud_example" name="pointcloud_example" output="screen" />
+  <node pkg="ece6460_pointcloud_example" type="pointcloud_example" name="pointcloud_example" output="screen" >
+    <remap from="points" to="/cepton/points_raw" />
+  </node>
 
   <!-- Start Gazebo and run ACC simulation -->
   <include file="$(find avs_lecture_launch)/launch/sim_launch.launch" >

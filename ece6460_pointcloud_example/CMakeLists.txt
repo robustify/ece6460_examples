@@ -32,3 +32,14 @@ target_link_libraries(pointcloud_example
   ${catkin_LIBRARIES}
 )
 
+add_executable(cluster_example
+  src/cluster_example_node.cpp
+  src/ClusterExample.cpp
+)
+add_dependencies(cluster_example
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_gencfg
+)
+target_link_libraries(cluster_example
+  ${catkin_LIBRARIES}
+)

@@ -9,7 +9,7 @@ namespace ece6460_pointcloud_example
   {
     srv_.setCallback(boost::bind(&PointCloudExample::reconfig, this, _1, _2));
 
-    sub_cloud_ = n.subscribe<sensor_msgs::PointCloud2>("cepton/points_raw", 10, &PointCloudExample::recvCloud, this);
+    sub_cloud_ = n.subscribe<sensor_msgs::PointCloud2>("points", 10, &PointCloudExample::recvCloud, this);
     pub_filtered_cloud_ = n.advertise<sensor_msgs::PointCloud2>("filtered_cloud", 10);
   }
 
@@ -31,9 +31,7 @@ namespace ece6460_pointcloud_example
     pcl::PassThrough<pcl::PointXYZ> pass;
 
     // Give passthrough filter the pointer to the cloud we want to filter
-    // and the indices vector to store the selected points
     pass.setInputCloud (input_cloud);
-    pass.setIndices (roi_indices);
 
     // Ask passthrough filter to extract points in a given X range
     pass.setFilterFieldName ("x");

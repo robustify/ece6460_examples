@@ -3,7 +3,7 @@
 
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "lidar_seg_node");
+  ros::init(argc, argv, "pointcloud_example_node");
   ros::NodeHandle n;
   ros::NodeHandle pn("~");
   
