@@ -62,6 +62,7 @@ namespace ece6460_pointcloud_example
       double ny = cloud_normals->points[non_vertical_normals.indices[i]].normal_y;
       double nz = cloud_normals->points[non_vertical_normals.indices[i]].normal_z;
 
+      // Start converting unit vector to quaternion
       tf2::Quaternion q;
       tf2::Matrix3x3 rot_mat;
       if (fabs(nz) < 0.01) {
@@ -76,6 +77,8 @@ namespace ece6460_pointcloud_example
         rot_mat[2] = rot_mat[0].cross(rot_mat[1]);
       }
       rot_mat.getRotation(q);
+
+      // Load quaternion into pose message
       tf2::convert(q.inverse(), p.orientation);
       normals_.poses.push_back(p);
     }

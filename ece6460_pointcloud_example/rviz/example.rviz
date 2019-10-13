@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /BoundingBoxArray1
       Splitter Ratio: 0.5
     Tree Height: 719
   - Class: rviz/Selection
@@ -57,65 +58,108 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
-        base_footprint:
-          Value: true
-        base_link:
-          Value: true
-        cepton:
-          Value: true
-        map:
-          Value: true
-        perfect_gps:
-          Value: true
-        steer_fl:
-          Value: true
-        steer_fr:
-          Value: true
-        utm:
-          Value: true
-        wheel_fl:
-          Value: true
-        wheel_fr:
-          Value: true
-        wheel_rl:
-          Value: true
-        wheel_rr:
-          Value: true
-        world:
-          Value: true
       Marker Scale: 3
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        base_footprint:
-          base_link:
-            steer_fl:
-              wheel_fl:
-                {}
-            steer_fr:
-              wheel_fr:
-                {}
-            wheel_rl:
-              {}
-            wheel_rr:
-              {}
-          cepton:
-            {}
-          perfect_gps:
-            {}
-        utm:
-          map:
-            world:
-              {}
+        {}
       Update Interval: 0
       Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: ""
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: PointCloud2
+      Position Transformer: ""
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Flat Squares
+      Topic: /ouster/points_raw
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: ""
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: PointCloud2
+      Position Transformer: ""
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Flat Squares
+      Topic: /filtered_cloud
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Arrow Length: 0.30000001192092896
+      Axes Length: 0.30000001192092896
+      Axes Radius: 0.009999999776482582
+      Class: rviz/PoseArray
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.07000000029802322
+      Head Radius: 0.029999999329447746
+      Name: PoseArray
+      Shaft Length: 0.23000000417232513
+      Shaft Radius: 0.009999999776482582
+      Shape: Arrow (Flat)
+      Topic: /normals
+      Unreliable: false
+      Value: true
+    - Class: jsk_rviz_plugin/BoundingBoxArray
+      Enabled: true
+      Name: BoundingBoxArray
+      Topic: /objects
+      Unreliable: false
+      Value: true
+      alpha: 0.800000011920929
+      color: 25; 255; 0
+      coloring: Auto
+      line width: 0.004999999888241291
+      only edge: false
+      show coords: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: base_footprint
+    Fixed Frame: ouster
     Frame Rate: 30
   Name: root
   Tools:
@@ -154,10 +198,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4147970676422119
+      Pitch: 0.2797969877719879
       Target Frame: <Fixed Frame>
       Value: XYOrbit (rviz)
-      Yaw: 3.136699914932251
+      Yaw: 0.35670018196105957
     Saved: ~
 Window Geometry:
   Displays:
