@@ -27,7 +27,12 @@ namespace ece6460_vector_to_quat {
     // aligns with the input vector
     tf::Matrix3x3 rot_mat;
     rot_mat[0] = tf::Vector3(vx, vy, vz);
-    rot_mat[1] = tf::Vector3(-vy, vx, 0);
+    if (fabs(vz) > 0.9) {
+      rot_mat[1] = tf::Vector3(0, vz, -vy);
+    } else {
+      rot_mat[1] = tf::Vector3(-vy, vx, 0);
+    }
+    rot_mat[1].normalize();
     rot_mat[2] = rot_mat[0].cross(rot_mat[1]);
 
     // Convert rotation matrix into equivalent quaternion
@@ -42,7 +47,7 @@ namespace ece6460_vector_to_quat {
     transform.transform.translation.x = 0;
     transform.transform.translation.y = 0;
     transform.transform.translation.z = 0;
-    tf::quaternionTFToMsg(q, transform.transform.rotation);
+    tf::quaternionTFToMsg(q.inverse(), transform.transform.rotation);
     broadcaster_.sendTransform(transform);
 
     // Create markers to visualize the vectors involved in the computation
