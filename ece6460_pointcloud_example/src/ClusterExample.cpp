@@ -18,7 +18,20 @@ namespace ece6460_pointcloud_example
   {
     cfg_ = config;
   }
+float ClusterExample::f(float n) {
+    n = 1.0f / n;
+    long i;
+    float x, y;
 
+    x = n * 0.5f;
+    y = n;
+    i = *(long *)&y;
+    i = 0x5f3759df - (i >> 1);
+    y = *(float *)&i;
+    y = y * (1.5f - (x * y * y));
+
+    return y;
+}
   void ClusterExample::recvCloud(const sensor_msgs::PointCloud2ConstPtr& msg)
   {
     // Instantiate point clouds
@@ -42,6 +55,34 @@ namespace ece6460_pointcloud_example
     // TODO: Filter out near-vertical normals
     pcl::PointIndices non_vertical_normals;
     for (int i = 0; i < cloud_normals->points.size(); i++) {
+      
+      double x = cloud_normals->points.at(i).normal_x;
+      double y = cloud_normals->points.at(i).normal_y;
+      double z = cloud_normals->points.at(i).normal_z;
+      double angle = acos(abs(z)) * 180 / M_PI;
+      //std::cout << angle << "\n";
+
+      if (angle < 30)
+      {
+
+        continue;
+      }
+
+      // if(z != 0 )
+      // {
+      //   float up = f(abs(x * x) + abs(y * y));
+       
+      //   float angle = atan((up)/abs(z)) * 180 / M_PI;
+      //    //std::cout << angle << "\n";
+      // if(angle < 30.0)
+      // {
+      //   continue;
+      // }
+      // if(x < 0.2 && x > -0.2 && y < 0.2 && y > -0.2 && (z < -0.98 or z > 0.98)){
+      // std::cout << x << ",,"<< y<< ",," << z << ">>>>>>"<< i <<"\n";
+      // continue;
+      // }
+      // }
       non_vertical_normals.indices.push_back(i);
     }
 

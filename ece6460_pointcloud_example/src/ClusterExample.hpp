@@ -3,6 +3,8 @@
 #include <ros/ros.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <tf/tf.h>
+
 
 #include <dynamic_reconfigure/server.h>
 #include <ece6460_pointcloud_example/PointCloudExampleConfig.h>
@@ -36,6 +38,8 @@ namespace ece6460_pointcloud_example
 
       void filterRawCloud(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_in, 
                           pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud_out);
+      
+      float f(float n);
 
       ros::Publisher pub_filtered_cloud_;
       ros::Publisher pub_normals_;
