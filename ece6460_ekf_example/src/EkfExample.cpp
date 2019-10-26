@@ -72,7 +72,11 @@ StateVector EkfExample::statePrediction(double dt, const StateVector& old_state)
   double old_yaw_rate = old_state(4);
 
   StateVector new_state;
-  // TODO: populate new_state by propagating old_state by dt
+  new_state(0) = old_state(0) + dt * old_speed * cos(old_heading);
+  new_state(1) = old_state(1) + dt * old_speed * sin(old_heading);
+  new_state(2) = old_state(2) + dt * old_yaw_rate;
+  new_state(3) = old_state(3);
+  new_state(4) = old_state(4);
   return new_state;
 }
 
@@ -93,8 +97,7 @@ StateMatrix EkfExample::stateJacobian(double dt, const StateVector& state)
 
 StateMatrix EkfExample::covPrediction(const StateMatrix& A, const StateMatrix& Q, const StateMatrix& old_cov)
 {
-  StateMatrix new_cov;
-  // TODO: Propagate covariance matrix one step
+  StateMatrix new_cov = A * old_cov * A.transpose() + Q;
   return new_cov;
 }
 
@@ -140,17 +143,30 @@ void EkfExample::updateFilterGPS(const ros::Time& current_time, const tf::Vector
   StateVector predicted_state = statePrediction(dt, X_);
   StateMatrix predicted_cov = covPrediction(A, Q_, P_);
 
-  // TODO: Construct C matrix for a GPS update (X and Y position measurements)
+  // Construct C matrix for a GPS update (X and Y position measurements)
+  Eigen::Matrix<double, 2, 5> C;
+  C << 1, 0, 0, 0, 0,
+       0, 1, 0, 0, 0;
   
-  // TODO: Use C and predicted state to compute expected measurement
+  // Use C and predicted state to compute expected measurement
+  Eigen::Matrix<double, 2, 1> expected_meas = C * predicted_state;
 
-  // TODO: Put GPS measurements in an Eigen object
+  // Put GPS measurements in an Eigen object
+  Eigen::Matrix<double, 2, 1> real_meas;
+  real_meas << position.x(), position.y();
 
-  // TODO: Define R matrix for the GPS measurements
+  // Define R matrix for the GPS measurements
+  Eigen::Matrix<double, 2, 2> R;
+  R << cfg_.r_gps * cfg_.r_gps, 0,
+       0, cfg_.r_gps * cfg_.r_gps;
 
-  // TODO: Compute Kalman gain
+  // Compute Kalman gain
+  Eigen::Matrix<double, 5, 2> K;
+  K = predicted_cov * C.transpose() * (C * predicted_cov * C.transpose() + R).inverse();
 
-  // TODO: Update filter estimate based on difference between actual and expected measurements
+  // Update filter estimate based on difference between actual and expected measurements
+  X_ = predicted_state + K * (real_meas - expected_meas);
+  P_ = (StateMatrix::Identity() - K * C) * predicted_cov;
 
   // If using a measurement from the past (dt < 0), re-propagate filter to the current estimate stamp
   if (dt < 0) {
@@ -187,18 +203,31 @@ void EkfExample::updateFilterTwist(const ros::Time& current_time, const geometry
   StateVector predicted_state = statePrediction(dt, X_);
   StateMatrix predicted_cov = covPrediction(A, Q_, P_);
 
-  // TOOD: Construct C matrix for a twist update (speed and yaw rate measurements)
+  // Construct C matrix for a GPS update (speed and yaw rate measurements)
+  Eigen::Matrix<double, 2, 5> C;
+  C << 0, 0, 0, 1, 0,
+       0, 0, 0, 0, 1;
   
-  // TODO: Use C and predicted state to compute expected measurement
+  // Use C and predicted state to compute expected measurement
+  Eigen::Matrix<double, 2, 1> expected_meas = C * predicted_state;
 
-  // TODO: Put twist measurements in an Eigen object
+  // Put GPS measurements in an Eigen object
+  Eigen::Matrix<double, 2, 1> real_meas;
+  real_meas << twist.linear.x, twist.angular.z;
 
-  // TODO: Define R matrix for the twist measurements
+  // Define R matrix for the GPS measurements
+  Eigen::Matrix<double, 2, 2> R;
+  R << cfg_.r_speed * cfg_.r_speed, 0,
+       0, cfg_.r_yaw_rate * cfg_.r_yaw_rate;
 
-  // TODO: Compute Kalman gain
+  // Compute Kalman gain
+  Eigen::Matrix<double, 5, 2> K;
+  K = predicted_cov * C.transpose() * (C * predicted_cov * C.transpose() + R).inverse();
 
-  // TODO: Update filter estimate based on difference between actual and expected measurements
-
+  // Update filter estimate based on difference between actual and expected measurements
+  X_ = predicted_state + K * (real_meas - expected_meas);
+  P_ = (StateMatrix::Identity() - K * C) * predicted_cov;
+  
   // Wrap heading estimate into the range -pi to pi
   if (X_(2) > M_PI) {
     X_(2) -= 2 * M_PI;
