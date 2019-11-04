@@ -1,5 +1,4 @@
 #include "LaneDetection.hpp"
-#include "bezier.hpp"
 
 #define DEBUG 1
 
@@ -15,6 +14,7 @@ LaneDetection::LaneDetection(ros::NodeHandle n, ros::NodeHandle pn) :
   sub_cam_info_ = n.subscribe("camera_info", 1, &LaneDetection::recvCameraInfo, this);
   sub_image_ = n.subscribe("image_rect_color", 1, &LaneDetection::recvImage, this);
   pub_markers_ = n.advertise<visualization_msgs::MarkerArray>("projected_lines", 1);
+  pub_cloud_ = n.advertise<sensor_msgs::PointCloud2>("cluster_cloud", 1);
 
   srv_.setCallback(boost::bind(&LaneDetection::reconfig, this, _1, _2));
   looked_up_camera_transform_ = false;
@@ -33,8 +33,8 @@ void LaneDetection::recvImage(const sensor_msgs::ImageConstPtr& msg)
   // because otherwise there is no point in detecting a lane!
   if (!looked_up_camera_transform_) {
     try {
-      // msg->header.frame_id
-      camera_transform_ = buffer_.lookupTransform("base_footprint", "front_camera_optical", msg->header.stamp);
+      geometry_msgs::TransformStamped transform = buffer_.lookupTransform("base_footprint", "front_camera_optical", msg->header.stamp);
+      tf2::convert(transform.transform, camera_transform_);
       looked_up_camera_transform_ = true; // Once the lookup is successful, there is no need to keep doing the lookup
                                           // because the transform is constant
     } catch (tf2::TransformException& ex) {
@@ -62,9 +62,13 @@ void LaneDetection::recvImage(const sensor_msgs::ImageConstPtr& msg)
   // Project points from 2D pixel coordinates into 3D where it intersects
   // the ground plane, and put them in a PCL point cloud
   pcl::PointCloud<pcl::PointXYZ>::Ptr bin_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+
+  // Project every fourth row of the image to save some computational resources
   for (int i = 0; i < bin_img.rows; i += 4) {
     for (int j = 0; j < bin_img.cols; j++) {
       if (bin_img.at<uint8_t>(i, j) == 255) {
+        // We found a white pixel corresponding to a lane marking. Project to ground
+        // and add to point cloud
         geometry_msgs::Point proj_p = projectPoint(model, cv::Point(j, i));
         pcl::PointXYZ p;
         p.x = proj_p.x;
@@ -75,8 +79,15 @@ void LaneDetection::recvImage(const sensor_msgs::ImageConstPtr& msg)
     }
   }
   
+  // Publish point cloud to visualize in Rviz
+  sensor_msgs::PointCloud2 cloud_msg;
+  pcl::toROSMsg(*bin_cloud, cloud_msg);
+  cloud_msg.header.frame_id = "base_footprint";
+  cloud_msg.header.stamp = msg->header.stamp;
+  pub_cloud_.publish(cloud_msg);
+
   // Use Euclidean clustering to group dashed lines together
-  // and fill in gaps in detection
+  // and separate each distinct line into separate point clouds
   std::vector<pcl::PointIndices> cluster_indices;
   pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
   ec.setClusterTolerance(cfg_.cluster_tol);
@@ -98,40 +109,55 @@ void LaneDetection::recvImage(const sensor_msgs::ImageConstPtr& msg)
     cluster_clouds.push_back(cluster);
   }
 
-  // Construct 2nd order Bezier curve fits to each cluster cloud
-  std::vector<BezierCurve> curves(cluster_clouds.size());
+  // Construct polynomial curve fits to each cluster cloud
+  std::vector<CurveFit> curves;
   for (size_t i = 0; i < cluster_clouds.size(); i++) {
-    if (!Bezier::fitPoints(cluster_clouds[i], curves[i], 2)) {
+    CurveFit new_curve;
+    // TODO: Quantify quality of the curve fit
+    if (!fitPoints(cluster_clouds[i], cfg_.fit_order, new_curve)) {
       ROS_WARN("Failed curve fit");
       continue;
     }
+    curves.push_back(new_curve);
   }
 
-  // Visualize output
+  // Construct Rviz marker output to visualize curve fit
   visualization_msgs::MarkerArray marker_msg;
   visualization_msgs::Marker viz_marker;
   viz_marker.header.frame_id = "base_footprint";
   viz_marker.header.stamp = msg->header.stamp;
   viz_marker.action = visualization_msgs::Marker::ADD;
+  viz_marker.pose.orientation.w = 1;
+  viz_marker.id = 0;
+
+  // Use the LINE_STRIP type to display a line connecting each point
   viz_marker.type = visualization_msgs::Marker::LINE_STRIP;
+
+  // Red
   viz_marker.color.a = 1.0;
   viz_marker.color.r = 1.0;
   viz_marker.color.g = 0.0;
   viz_marker.color.b = 0.0;
-  viz_marker.scale.x = 0.1;
-  viz_marker.pose.orientation.w = 1;
-  viz_marker.id = 0;
 
+  // 0.1 meters thick line
+  viz_marker.scale.x = 0.1;
+
+  // Sample polynomial and add line strip marker to array
+  // for each separate cluster
   for (auto& curve : curves) {
-    Bezier::visualize(curve, viz_marker.points);
+    visualizePoints(curve, viz_marker.points);
     marker_msg.markers.push_back(viz_marker);
     viz_marker.id++;
   }
 
+  // Delete markers to avoid ghost markers from lingering if
+  // the number of markers being published changes
   visualization_msgs::MarkerArray delete_markers;
   delete_markers.markers.resize(1);
   delete_markers.markers[0].action = visualization_msgs::Marker::DELETEALL;
   pub_markers_.publish(delete_markers);
+
+  // Publish for visualization
   pub_markers_.publish(marker_msg);
 }
 
@@ -220,25 +246,88 @@ void LaneDetection::detectYellow(const cv::Mat& hue_img, const cv::Mat& sat_img,
 // Project 2D pixel point 'p' into vehicle's frame and return as 3D point
 geometry_msgs::Point LaneDetection::projectPoint(const image_geometry::PinholeCameraModel& model, const Point2d& p)
 {
-  // Convert camera_transform_ into a tf2::Transform
-  tf2::Transform tf_transform;
-  tf2::convert(camera_transform_.transform, tf_transform);
-
-  // Convert the input pixel coordinates into a 3d ray, where x and y are projected to the point where z is equal to 1.0
-  Point3d cam_frame_ray = model.projectPixelTo3dRay(p);
+  // TODO: Convert the input pixel coordinates into a 3d ray, where x and y are projected to the point where z is equal to 1.0
   
-  // Extract rotation matrix from footprint frame to camera frame
-  tf2::Matrix3x3 rot_mat = tf_transform.getBasis();
-
   // TODO: Represent camera frame ray in footprint frame
 
-  // TODO: Scale the ray such that the end is on the ground plane
+  // TODO: Using the concept of similar triangles, scale the unit vector such that the end is on the ground plane.
 
-  // TODO: Add translation from footprint frame to camera frame to obtain the final coordinates in footprint frame
+  // TODO: Then add camera position offset to obtain the final coordinates in footprint frame
 
   // TODO: Fill output point with the result of the projection
   geometry_msgs::Point point;
   return point;
+}
+
+// This function inputs a PCL point cloud and applies a least squares curve fit
+// to the points which fits an optimal polynomial curve of the desired order
+bool LaneDetection::fitPoints(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, int order, CurveFit& curve)
+{
+  // Check if it is mathematically possible to fit a curve to the data
+  if (cloud->points.size() <= order) {
+    return false;
+  }
+
+  Eigen::MatrixXd regression_matrix(cloud->points.size(), order + 1);
+  Eigen::VectorXd y_samples(cloud->points.size());
+
+  curve.min_x = INFINITY;
+  curve.max_x = 0.0;
+  for (int i = 0; i < cloud->points.size(); i++) {
+    y_samples(i) = cloud->points[i].y;
+
+    // Fill in row of regression matrix
+    // [1, x, x^2, ..., x^M]
+    double tx = 1.0;
+    for (int j = 0; j <= order; j++) {
+      regression_matrix(i, j) = tx;
+      tx *= cloud->points[i].x;
+    }
+
+    // Compute the minimum value of x to constrain
+    // the polynomial curve
+    if (cloud->points[i].x < curve.min_x) {
+      curve.min_x = cloud->points[i].x;
+    }
+
+    // Compute the maximum value of x to constrain
+    // the polynomial curve
+    if (cloud->points[i].x > curve.max_x) {
+      curve.max_x = cloud->points[i].x;
+    }
+  }
+
+  // TODO: Invert regression matrix with left pseudoinverse operation
+
+  // TODO: Perform least squares estimation and obtain polynomial coefficients
+
+  // TODO: Populate 'poly_coeff' field of the 'curve' argument output
+
+  return true; // Successful curve fit!
+}
+
+// This method samples a curve fit between its minimum and maximum valid values
+// and outputs an array of geometry_msgs::Point to put into a Rviz marker message
+void LaneDetection::visualizePoints(const CurveFit& curve, std::vector<geometry_msgs::Point>& points)
+{
+  points.clear();
+
+  // Sample points at 0.05 meter resolution
+  for (double x = curve.min_x; x <= curve.max_x; x += 0.05) {
+    geometry_msgs::Point p;
+    // Copy x value
+    p.x = x;
+
+    // Compute y value based on the order of the curve
+    // y = a0 + a1 * x + a2 * x^2 + ... + aM * x^M
+    double t = 1.0;
+    for (size_t i = 0; i < curve.poly_coeff.size(); i++) {
+      p.y += curve.poly_coeff[i] * t;
+      t *= p.x;
+    }
+
+    points.push_back(p);
+  }
 }
 
 void LaneDetection::recvCameraInfo(const sensor_msgs::CameraInfoConstPtr& msg)

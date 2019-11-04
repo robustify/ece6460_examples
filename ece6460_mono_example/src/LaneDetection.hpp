@@ -4,17 +4,25 @@
 #include <std_msgs/Float64.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
-#include <opencv2/opencv.hpp>
-#include <cv_bridge/cv_bridge.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#include <tf2_ros/transform_listener.h>
-#include <image_geometry/pinhole_camera_model.h>
-#include <dynamic_reconfigure/server.h>
-#include <ece6460_mono_example/LaneDetectionConfig.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <eigen3/Eigen/Dense>
-#include <sensor_msgs/PointCloud.h>
 
+// Dynamic reconfigure headers
+#include <dynamic_reconfigure/server.h>
+#include <ece6460_mono_example/LaneDetectionConfig.h>
+
+// TF lookup headers
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_ros/transform_listener.h>
+
+// Image processing and camera geometry headers
+#include <opencv2/opencv.hpp>
+#include <cv_bridge/cv_bridge.h>
+#include <image_geometry/pinhole_camera_model.h>
+
+// PCL headers
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
 #include <pcl/common/common.h>
 #include <pcl/kdtree/kdtree.h>
@@ -23,6 +31,13 @@
 
 namespace ece6460_mono_example
 {
+
+// Structure to define a curve fit
+typedef struct {
+  std::vector<double> poly_coeff; // Coefficients of the polynomial
+  double min_x; // Minimum x value where polynomial is defined
+  double max_x; // Maximum x value where polynomial is defined
+} CurveFit;
 
 class LaneDetection
 {
@@ -39,6 +54,8 @@ class LaneDetection
     void detectYellow(const cv::Mat& hue_img, const cv::Mat& sat_img, cv::Mat& yellow_bin_img);
 
     geometry_msgs::Point projectPoint(const image_geometry::PinholeCameraModel& model, const cv::Point2d& p);
+    bool fitPoints(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, int order, CurveFit& curve);
+    void visualizePoints(const CurveFit& curve, std::vector<geometry_msgs::Point>& points);
 
     tf2_ros::TransformListener listener_;
     tf2_ros::Buffer buffer_;
@@ -46,12 +63,13 @@ class LaneDetection
     ros::Subscriber sub_image_;
     ros::Subscriber sub_cam_info_;
     ros::Publisher pub_markers_;
+    ros::Publisher pub_cloud_;
 
     dynamic_reconfigure::Server<LaneDetectionConfig> srv_;
     LaneDetectionConfig cfg_;
 
     sensor_msgs::CameraInfo camera_info_;
-    geometry_msgs::TransformStamped camera_transform_; // Coordinate transformation from footprint to camera
+    tf2::Transform camera_transform_; // Coordinate transformation from footprint to camera
     bool looked_up_camera_transform_;
     pcl::search::Search<pcl::PointXYZ>::Ptr kd_tree_;
 };

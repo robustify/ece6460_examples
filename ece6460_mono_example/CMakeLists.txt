@@ -17,20 +17,6 @@ generate_dynamic_reconfigure_options(
   cfg/LaneDetection.cfg
 )
 
-add_message_files(
-  DIRECTORY
-    msg
-  FILES
-    BezierCurve.msg
-    BezierArray.msg
-)
-
-generate_messages(
-  DEPENDENCIES
-    std_msgs
-    geometry_msgs
-)
-
 catkin_package(
   DEPENDS OpenCV
 )
