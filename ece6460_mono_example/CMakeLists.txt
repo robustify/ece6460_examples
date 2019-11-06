@@ -30,6 +30,9 @@ add_executable(lane_detection_example
   src/lane_detection_example.cpp
   src/LaneDetection.cpp
 )
+add_dependencies(lane_detection_example
+  ${PROJECT_NAME}_gencfg
+)
 target_link_libraries(lane_detection_example
   ${catkin_LIBRARIES}
 )
