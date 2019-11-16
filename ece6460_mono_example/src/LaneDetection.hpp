@@ -68,6 +68,7 @@ class LaneDetection
 
     dynamic_reconfigure::Server<LaneDetectionConfig> srv_;
     LaneDetectionConfig cfg_;
+    std::string camera_name_;
 
     sensor_msgs::CameraInfo camera_info_;
     tf2::Transform camera_transform_; // Coordinate transformation from footprint to camera

@@ -19,6 +19,8 @@ LaneDetection::LaneDetection(ros::NodeHandle n, ros::NodeHandle pn) :
   srv_.setCallback(boost::bind(&LaneDetection::reconfig, this, _1, _2));
   looked_up_camera_transform_ = false;
 
+  pn.param("camera_name", camera_name_, std::string("front_camera"));
+
 #if DEBUG
   namedWindow("Binary", CV_WINDOW_NORMAL);
 #endif
@@ -33,7 +35,7 @@ void LaneDetection::recvImage(const sensor_msgs::ImageConstPtr& msg)
   // because otherwise there is no point in detecting a lane!
   if (!looked_up_camera_transform_) {
     try {
-      geometry_msgs::TransformStamped transform = buffer_.lookupTransform("base_footprint", "front_camera_optical", msg->header.stamp);
+      geometry_msgs::TransformStamped transform = buffer_.lookupTransform("base_footprint", camera_name_ + "_optical", msg->header.stamp);
       tf2::convert(transform.transform, camera_transform_);
       looked_up_camera_transform_ = true; // Once the lookup is successful, there is no need to keep doing the lookup
                                           // because the transform is constant
