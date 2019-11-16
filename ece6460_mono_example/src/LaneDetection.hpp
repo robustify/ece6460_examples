@@ -56,7 +56,8 @@ class LaneDetection
     geometry_msgs::Point projectPoint(const image_geometry::PinholeCameraModel& model, const cv::Point2d& p);
     bool fitPoints(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, int order, CurveFit& curve);
     void visualizePoints(const CurveFit& curve, std::vector<geometry_msgs::Point>& points);
-
+    bool checkCurve(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, const CurveFit& curve);
+    
     tf2_ros::TransformListener listener_;
     tf2_ros::Buffer buffer_;
 

@@ -118,7 +118,10 @@ void LaneDetection::recvImage(const sensor_msgs::ImageConstPtr& msg)
       ROS_WARN("Failed curve fit");
       continue;
     }
-    curves.push_back(new_curve);
+
+    if (checkCurve(cluster_clouds[i], new_curve)) {
+      curves.push_back(new_curve);
+    }
   }
 
   // Construct Rviz marker output to visualize curve fit
@@ -246,16 +249,24 @@ void LaneDetection::detectYellow(const cv::Mat& hue_img, const cv::Mat& sat_img,
 // Project 2D pixel point 'p' into vehicle's frame and return as 3D point
 geometry_msgs::Point LaneDetection::projectPoint(const image_geometry::PinholeCameraModel& model, const Point2d& p)
 {
-  // TODO: Convert the input pixel coordinates into a 3d ray, where x and y are projected to the point where z is equal to 1.0
+  // Convert the input pixel coordinates into a 3d ray, where x and y are projected to the point where z is equal to 1.0
+  cv::Point3d cam_frame_ray = model.projectPixelTo3dRay(p);
   
-  // TODO: Represent camera frame ray in footprint frame
+  // Represent camera frame ray in footprint frame
+  tf2::Vector3 footprint_frame_ray = camera_transform_.getBasis() * tf2::Vector3(cam_frame_ray.x, cam_frame_ray.y, cam_frame_ray.z);
 
-  // TODO: Using the concept of similar triangles, scale the unit vector such that the end is on the ground plane.
+  // Using the concept of similar triangles, scale the unit vector such that the end is on the ground plane.
+  double s = -camera_transform_.getOrigin().z() / footprint_frame_ray.z();
+  tf2::Vector3 ground_plane_ray = s * footprint_frame_ray;
 
-  // TODO: Then add camera position offset to obtain the final coordinates in footprint frame
+  // Then add camera position offset to obtain the final coordinates in footprint frame
+  tf2::Vector3 vehicle_frame_point = ground_plane_ray + camera_transform_.getOrigin();
 
-  // TODO: Fill output point with the result of the projection
+  // Fill output point with the result of the projection
   geometry_msgs::Point point;
+  point.x = vehicle_frame_point.x();
+  point.y = vehicle_frame_point.y();
+  point.z = vehicle_frame_point.z();
   return point;
 }
 
@@ -277,7 +288,7 @@ bool LaneDetection::fitPoints(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, 
     y_samples(i) = cloud->points[i].y;
 
     // Fill in row of regression matrix
-    // [1, x, x^2, ..., x^M]
+    // [1, x, x^2, ..., x^N]
     double tx = 1.0;
     for (int j = 0; j <= order; j++) {
       regression_matrix(i, j) = tx;
@@ -297,13 +308,47 @@ bool LaneDetection::fitPoints(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, 
     }
   }
 
-  // TODO: Invert regression matrix with left pseudoinverse operation
+  // Invert regression matrix with left pseudoinverse operation
+  Eigen::MatrixXd inv_regression_matrix = (regression_matrix.transpose() * regression_matrix).inverse() * regression_matrix.transpose();
 
-  // TODO: Perform least squares estimation and obtain polynomial coefficients
+  // Perform least squares estimation and obtain polynomial coefficients
+  Eigen::VectorXd poly_coeff_matrix = inv_regression_matrix * y_samples;
 
-  // TODO: Populate 'poly_coeff' field of the 'curve' argument output
+  // Populate 'poly_coeff' field of the 'curve' argument output
+  curve.poly_coeff.resize(poly_coeff_matrix.rows());
+  for (size_t i = 0; i < poly_coeff_matrix.rows(); i++) {
+    curve.poly_coeff[i] = poly_coeff_matrix(i);
+  }
 
   return true; // Successful curve fit!
+}
+
+bool LaneDetection::checkCurve(const pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, const CurveFit& curve)
+{
+
+  double rms;
+  std::vector<double> error_samples;
+  for (size_t i = 0; i < cloud->points.size(); i++) {
+    double new_error;
+    double y_hat = 0.0;
+    double t = 1.0;
+    for (size_t j = 0; j < curve.poly_coeff.size(); j++) {
+      y_hat += curve.poly_coeff[j] * t;
+      t *= cloud->points[i].x;
+    }
+    new_error = cloud->points[i].y - y_hat;
+    error_samples.push_back(new_error);
+  }
+
+  double mean_square = 0;
+  for (size_t i = 0; i < cloud->points.size(); i++) {
+    mean_square += error_samples[i] * error_samples[i];
+  }
+  mean_square /= (double)cloud->points.size();
+
+  rms = sqrt(mean_square);
+
+  return rms < cfg_.rms_tolerance;
 }
 
 // This method samples a curve fit between its minimum and maximum valid values
